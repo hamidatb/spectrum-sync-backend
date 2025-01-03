@@ -60,13 +60,7 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_F8DB1B43381B41B49F8455FAD1EE3C67 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_36024B5D4A2742EFBBD2F36218C691AF }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C76F4711EFA749F88525C895B0009990 }}
-      
-      - name: Set environment variables for Azure App Service
-        run: |
-          echo "DB_SERVER=${{ secrets.DB_SERVER }}" >> $GITHUB_ENV
-          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> $GITHUB_ENV
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
-          
+         
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
