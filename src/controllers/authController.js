@@ -6,6 +6,12 @@ const sql = require('mssql');
 const User = require('../models/User');
 require('dotenv').config();
 
+// Validate JWT Secret
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+    throw new Error('JWT_SECRET is not set in environment variables.');
+}
+
 // Configure SQL Server connection
 // These are in the .env
 const config = {
