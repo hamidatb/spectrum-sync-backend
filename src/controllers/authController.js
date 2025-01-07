@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken'); // Authentication token handling
 const bcrypt = require('bcryptjs'); // Password hashing
 const sql = require('mssql'); // SQL Server connection
+const connectToDatabase = require('../utils/dbConnection');
+const { validateUserId, validateEventId, validateFields } = require('../utils/validationUtils');
 require('dotenv').config(); // Load environment variables from .env
 
 // Validate JWT Secret
@@ -8,15 +10,6 @@ const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
     throw new Error('JWT_SECRET is not set in environment variables.');
 }
-
-// Configure SQL Server connection
-const config = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: process.env.DB_DATABASE,
-    port: parseInt(process.env.DB_PORT, 10),
-};
 
 // Register a new user
 exports.register = async (req, res) => {
@@ -28,9 +21,7 @@ exports.register = async (req, res) => {
     }
 
     try {
-        console.log('Connecting to SQL server...');
-        const pool = await sql.connect(config);
-        console.log('SQL server connected.');
+        const pool = await connectToDatabase();
 
         // Check if user already exists
         console.log(`Checking if user already exists with email: ${email}`);
@@ -54,8 +45,10 @@ exports.register = async (req, res) => {
         await pool.request()
             .input('username', sql.VarChar, username)
             .input('email', sql.VarChar, email)
-            .input('password', sql.VarChar, hashedPassword)
-            .query('INSERT INTO Users (username, email, password) VALUES (@username, @email, @password)');
+            .input('passwordHash', sql.VarChar, hashedPassword)
+            .query(
+                'INSERT INTO Users (username, email, passwordHash) VALUES (@username, @email, @passwordHash)'
+            );
 
         console.log('User inserted successfully.');
 
@@ -83,10 +76,7 @@ exports.register = async (req, res) => {
     } catch (error) {
         console.error('Error during registration:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-        console.log('Closing SQL connection...');
-        await sql.close();
-    }
+    } 
 };
 
 // Login user
@@ -99,9 +89,7 @@ exports.login = async (req, res) => {
     }
 
     try {
-        console.log('Connecting to SQL server...');
-        const pool = await sql.connect(config);
-        console.log('SQL server connected.');
+        const pool = await connectToDatabase();
 
         // Find user by email
         console.log(`Searching for user with email: ${email}`);
@@ -140,8 +128,5 @@ exports.login = async (req, res) => {
     } catch (error) {
         console.error('Error during login:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-        console.log('Closing SQL connection...');
-        await sql.close();
-    }
+    } 
 };
