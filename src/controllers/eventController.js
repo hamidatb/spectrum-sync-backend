@@ -1,5 +1,3 @@
-// src/controllers/eventController.js
-
 const sql = require('mssql');
 const Event = require('../models/Event');
 require('dotenv').config();
@@ -8,60 +6,89 @@ require('dotenv').config();
 const config = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER, // e.g., 'your_server.database.windows.net'
+    server: process.env.DB_SERVER,
     database: process.env.DB_DATABASE,
     port: parseInt(process.env.DB_PORT, 10),
-    options: {
-        encrypt: true, // Use this if you're on Windows Azure
-    },
 };
 
 // Create a new event
 exports.createEvent = async (req, res) => {
     const { title, description, date, location } = req.body;
 
+    console.log('Received request to create a new event:', { title, description, date, location });
+
     // Basic validation
     if (!title || !date || !location) {
+        console.warn('Missing required fields:', { title, date, location });
         return res.status(400).json({ message: 'Please enter all required fields' });
     }
 
     try {
-        // Connect to the database
+        console.log('Connecting to SQL server...');
         await sql.connect(config);
+        console.log('SQL server connected.');
 
         // Insert new event
-        const insertResult = await sql.query`
-            INSERT INTO Events (title, description, date, location, userId)
-            VALUES (${title}, ${description || null}, ${date}, ${location}, ${req.user.id})
-        `;
+        const insertResult = await pool.request()
+            .input('title', sql.VarChar, title)
+            .input('description', sql.VarChar, description || null)
+            .input('date', sql.DateTime, date)
+            .input('location', sql.VarChar, location)
+            .input('userId', sql.Int, req.user.id)
+            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId)');
 
-        res.status(201).json({ message: 'Event created successfully' });
+        console.log('Event inserted successfully:', insertResult);
+        // Return the inserted event details
+        res.status(201).json({
+            message: 'Event created successfully',
+            event: {
+                title,
+                description,
+                date,
+                location,
+                userId: req.user.id
+            },
+            insertResult: insertResult.recordset
+        });
     } catch (error) {
         console.error('Error creating event:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ 
+            message: 'Server error',
+            error: error.message
+        });
     } finally {
-        // Close the SQL connection
+        console.log('Closing SQL connection...');
         await sql.close();
+        console.log('SQL connection closed.');
     }
 };
 
 // Get all events for a user
 exports.getEvents = async (req, res) => {
+    console.log('Received request to fetch events for user:', req.user.id);
+
     try {
-        // Connect to the database
-        await sql.connect(config);
+        console.log('Connecting to SQL server...');
+        const pool = await sql.connect(config);
+        console.log('SQL server connected.');
 
-        // Retrieve events
-        const result = await sql.query`
-            SELECT * FROM Events WHERE userId = ${req.user.id} ORDER BY date ASC
-        `;
-
+        // Retrieve events using parameterized query
+        console.log('Fetching events from the database...');
+        const result = await pool.request()
+            .input('userId', sql.Int, req.user.id)
+            .query('SELECT * FROM Events WHERE userId = @userId ORDER BY date ASC');
+        
+        console.log('Events fetched successfully:', result.recordset);
         res.status(200).json(result.recordset);
     } catch (error) {
         console.error('Error fetching events:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ 
+            message: 'Server error',
+            error: error.message
+        });
     } finally {
-        // Close the SQL connection
+        console.log('Closing SQL connection...');
         await sql.close();
+        console.log('SQL connection closed.');
     }
 };

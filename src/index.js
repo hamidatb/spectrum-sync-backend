@@ -13,7 +13,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Routes
+// Routes (using Express)
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes); // Use event routes
 
@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server using the port provided by Azure 
-const PORT = process.env.PORT; // Remove any default fall back port
+const PORT = process.env.PORT; 
 if (!PORT) {
     console.error("PORT environment variable is not set.");
     process.exit(1); // Exit if PORT is not defined
