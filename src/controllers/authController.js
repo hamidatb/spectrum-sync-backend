@@ -1,9 +1,9 @@
 // src/controllers/authController.js
 
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const sql = require('mssql');
-const User = require('../models/User');
+const jwt = require('jsonwebtoken'); // authenticate users
+const bcrypt = require('bcryptjs'); // hash passwords
+const sql = require('mssql'); // connect to SQL databases 
+const User = require('../models/User'); // load env variable form .env to process.env
 require('dotenv').config();
 
 // Validate JWT Secret
@@ -28,34 +28,47 @@ exports.register = async (req, res) => {
 
     // Basic validation
     if (!username || !email || !password) {
-        return res.status(400).json({ message: 'Please enter all fields' });
+        return res.status(400).json({ message: 'Please enter all fields (username, email, and password)' });
     }
 
     try {
         // Connect to the database
+        console.log('Connecting to SQL server...');
         await sql.connect(config);
+        console.log('SQL server connected.');
 
         // Check if user already exists
-        const result = await sql.query`SELECT * FROM Users WHERE email = ${email}`;
+        console.log('Checking if user already exisst with email {email}');
+        const result = await sql.query`SELECT * FROM Users WHERE email = ${email}`; // I love SQL
         if (result.recordset.length > 0) {
+            console.log('User already exists');
             return res.status(400).json({ message: 'User already exists' });
         }
 
         // Hash password
+        console.log('Hashing password...');
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        console.log('Password hashed.');
 
-        // Insert new user
-        const insertResult = await sql.query`
+        // Insert new user into the db
+        console.log('Inserting new user into the database...');
+        // Parameterized queries to avoid injection attacks
+        await sql.query(`
             INSERT INTO Users (username, email, password)
-            VALUES (${username}, ${email}, ${hashedPassword})
-        `;
-
+            VALUES (@username, @email, @password)
+        `, {
+            username: username,
+            email: email,
+            password: hashedPassword
+        });
+        console.log('User inserted.');
+ 
         // Retrieve the inserted user
         const userResult = await sql.query`SELECT * FROM Users WHERE email = ${email}`;
         const user = userResult.recordset[0];
 
-        // Create JWT token
+        // Create JsonWeb token
         const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         res.status(201).json({
@@ -66,11 +79,14 @@ exports.register = async (req, res) => {
                 email: user.email,
             },
         });
+        console.log('Registration successful.');
     } catch (error) {
         console.error('Error during registration:', error);
-        res.status(500).json({ message: 'Server error' });
+        // This is the returning statment that is given back to Postman or Insomnia
+        res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         // Close the SQL connection
+        console.log('Closing SQL connection...');
         await sql.close();
     }
 };
@@ -89,8 +105,11 @@ exports.login = async (req, res) => {
         await sql.connect(config);
 
         // Find user by email
-        const result = await sql.query`SELECT * FROM Users WHERE email = ${email}`;
-        if (result.recordset.length === 0) {
+        const result = await sql.query(`
+            SELECT * FROM Users WHERE email = @Email
+        `, {
+            Email: email
+        });        if (result.recordset.length === 0) {
             return res.status(400).json({ message: 'User does not exist' });
         }
 
