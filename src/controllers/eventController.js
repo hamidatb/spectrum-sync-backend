@@ -109,3 +109,50 @@ exports.getEventById = async (req, res) => {
     }
 };
 
+// TODO - (PUT) Edit event by id
+exports.updateEvent = async (req, res) => {
+    if (!validateUserId(req, res)) return;
+    if (!validateEventId(req, res)) return;
+    
+    const userId = req.user.id;
+    const eventId = red.params.id;
+    console.log('Recieved request to edit event}:', {eventId, userId});
+};
+
+// TODO - (DELETE) Delete event by id
+exports.deleteEvent = async (req, res) => {
+    if (!validateUserId(req, res)) return;
+    if (!validateEventId(req, res)) return;
+    
+    const userId = req.user.id;
+    const eventId = red.params.id;
+    console.log('Recieved request to delete event:', {eventId, userId});
+};
+
+// TODO - (POST) Share an event with others by id
+exports.shareEvent = async (req, res) => {
+    if (!validateUserId(req, res)) return;
+    if (!validateEventId(req, res)) return;
+    
+    const userId = req.user.id;
+    const eventId = red.params.id;
+    console.log('Recieved request to share event details:', {eventId, userId});
+};
+
+// TODO - (POST) RSVP to an event by id
+exports.attendEvent = async (req, res) => {
+    if (!validateUserId(req, res)) return;
+    if (!validateEventId(req, res)) return;
+    
+    const userId = req.user.id;
+    const eventId = red.params.id;
+    console.log('Recieved request to RSVP to event:', {eventId, userId});
+};
+
+// TODO - (GET) Get all event invitations of a currently authenticated user 
+exports.getInvites = async (req, res) => {
+    if (!validateUserId(req, res)) return;
+    
+    const userId = req.user.id;
+    console.log('Recieved request to get all inviation details of user: ', userId);
+}; 
