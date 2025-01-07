@@ -1,15 +1,6 @@
 const sql = require('mssql');
-const Event = require('../models/Event');
-require('dotenv').config();
-
-// Configure SQL Server connection
-const config = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: process.env.DB_DATABASE,
-    port: parseInt(process.env.DB_PORT, 10),
-};
+const connectToDatabase = require('../utils/dbConnection');
+const { validateUserId, validateEventId, validateFields } = require('../utils/validationUtils');
 
 // (POST) Create a new event
 exports.createEvent = async (req, res) => {
@@ -22,10 +13,10 @@ exports.createEvent = async (req, res) => {
         return res.status(400).json({ message: 'Please enter all required fields' });
     }
 
+    if (!validateUserId(req, res)) return; // Validate user ID
+
     try {
-        console.log('Connecting to SQL server...');
-        await sql.connect(config);
-        console.log('SQL server connected.');
+        const pool = await connectToDatabase();
 
         // Insert new event
         const insertResult = await pool.request()
@@ -55,21 +46,22 @@ exports.createEvent = async (req, res) => {
             message: 'Server error',
             error: error.message
         });
-    } finally {
-        console.log('Closing SQL connection...');
-        await sql.close();
-        console.log('SQL connection closed.');
-    }
+    } 
 };
 
-// (POST) Retrieve all events for a user 
+// (GET) Retrieve all events for a user 
 exports.getEvents = async (req, res) => {
-    console.log('Received request to fetch events for user:', req.user.id);
+    const userId = req.user.id;
+    if (!userId) {
+        console.warn('User ID is missing from the request. Authorization failed.');
+        return res.status(401).json({ message: 'Unauthorized. Please log in again.' });
+    }
+
+    console.log('Received request to fetch events for user:', userId);
+
 
     try {
-        console.log('Connecting to SQL server...');
-        const pool = await sql.connect(config);
-        console.log('SQL server connected.');
+        const pool = await connectToDatabase();
 
         // Retrieve events using parameterized query
         console.log('Fetching events from the database...');
@@ -85,11 +77,7 @@ exports.getEvents = async (req, res) => {
             message: 'Server error',
             error: error.message
         });
-    } finally {
-        console.log('Closing SQL connection...');
-        await sql.close();
-        console.log('SQL connection closed.');
-    }
+    } 
 };
 
 // (GET) Retrieve event details by id
@@ -99,16 +87,30 @@ exports.getEventById = async (req, res) => {
 
     console.log('Recieved request to get event details:', {eventId, userId});
 
-    //Validate event ID
+    // Validate event ID and user ID
     if (!eventId) {
         console.warn('Event ID is missing in the request.');
         return res.status(400).json({ message: 'Event ID is required' });
     }
 
-    // Validate user ID
     if (!userId) {
         console.warn('User ID is missing from the request. Authorization failed.');
         return res.status(401).json({ message: 'Unauthorized. Please log in again.' });
+    }
+
+    const pool = await connectToDatabase();
+
+    // Retrieve the event details
+    const eventDetails = await pool.request()
+        .input('eventId', sql.Int, eventId)
+        .input('userId', sql.Int. userId)
+        .query(
+            'SELECT * FROM EVENTS WHERE id = @eventId AND userId = @userId'
+        );
+    
+    if (eventDetails.recordset.length === 0){
+        console.warn('No event found for the provided ID: ', eventId);
+        return res.status(404)
     }
 
 
