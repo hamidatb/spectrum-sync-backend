@@ -11,10 +11,9 @@ const config = {
     port: parseInt(process.env.DB_PORT, 10),
 };
 
-// Create a new event
+// (POST) Create a new event
 exports.createEvent = async (req, res) => {
     const { title, description, date, location } = req.body;
-
     console.log('Received request to create a new event:', { title, description, date, location });
 
     // Basic validation
@@ -63,7 +62,7 @@ exports.createEvent = async (req, res) => {
     }
 };
 
-// Get all events for a user
+// (POST) Retrieve all events for a user 
 exports.getEvents = async (req, res) => {
     console.log('Received request to fetch events for user:', req.user.id);
 
@@ -91,4 +90,26 @@ exports.getEvents = async (req, res) => {
         await sql.close();
         console.log('SQL connection closed.');
     }
+};
+
+// (GET) Retrieve event details by id
+exports.getEventById = async (req, res) => {
+    const eventId = req.params?.id;
+    const userId = req.user?.id;
+
+    console.log('Recieved request to get event details:', {eventId, userId});
+
+    //Validate event ID
+    if (!eventId) {
+        console.warn('Event ID is missing in the request.');
+        return res.status(400).json({ message: 'Event ID is required' });
+    }
+
+    // Validate user ID
+    if (!userId) {
+        console.warn('User ID is missing from the request. Authorization failed.');
+        return res.status(401).json({ message: 'Unauthorized. Please log in again.' });
+    }
+
+
 };
