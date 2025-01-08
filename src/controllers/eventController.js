@@ -24,7 +24,8 @@ exports.createEvent = async (req, res) => {
             .input('date', sql.DateTime, date)
             .input('location', sql.NVarChar, location)
             .input('userId', sql.Int, userId)
-            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId)');
+            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId) OUTPUT INSERTED.*');
+
 
         const newEvent = insertResult.recordset[0];
         console.log('Event inserted successfully:', insertResult);
@@ -80,9 +81,9 @@ exports.getEventById = async (req, res) => {
 
         const eventDetails = await pool.request()
             .input('eventId', sql.Int, eventId)
-            .input('userId'. sql.Int, userId)
+            .input('userId', sql.Int, userId)
             .query(
-                'SELECT * FROM Events WHERE id = @eventId AND userId = @userId'
+                'SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId'
             );
         
         if (eventDetails.recordset.length === 0) {
@@ -122,18 +123,12 @@ exports.updateEvent = async (req, res) => {
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('SELECT * FROM Events WHERE id = @eventId AND userId = @userId');
+            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId) OUTPUT INSERTED.*');
         
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);
             return res.status(404).json({ message: 'Event not found.' });
         }
-
-        console.log('Event details retrieved successfully:', eventDetails.recordset[0]);
-        res.status(200).json({
-            message: 'Event details retrieved successfully',
-            event: eventDetails.recordset[0],
-        });
 
         // Update the event
         const updateResult = await pool.request()
@@ -145,7 +140,7 @@ exports.updateEvent = async (req, res) => {
             .query(`
                 UPDATE Events 
                 SET title = @title, description = @description, date = @date, location = @location 
-                WHERE id = @eventId
+                WHERE eventId = @eventId
                 OUTPUT INSERTED.*
             `);
 
@@ -166,7 +161,7 @@ exports.updateEvent = async (req, res) => {
  */
 exports.deleteEvent = async (req, res) => {
     const userId = req.user.userId;
-    const eventId = red.params.id;
+    const eventId = req.params.id;
 
     console.log('Recieved request to delete event:', {eventId, userId});
 
@@ -180,7 +175,7 @@ exports.deleteEvent = async (req, res) => {
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('SELECT * FROM Events WHERE id = @eventId AND userId = @userId');
+            .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
 
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);
@@ -190,7 +185,7 @@ exports.deleteEvent = async (req, res) => {
         // Delete the event
         await pool.request()
             .input('eventId', sql.Int, eventId)
-            .query('DELETE FROM Events WHERE id = @eventId');
+            .query('DELETE FROM Events WHERE eventId = @eventId');
 
         console.log('Event deleted successfully:', eventId);
         res.status(200).json({ message: 'Event deleted successfully.' });
@@ -221,7 +216,9 @@ exports.shareEvent = async (req, res) => {
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('SELECT * FROM Events WHERE id = @eventId AND userId = @userId');
+            .query(
+                'SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId'
+            );
 
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);
@@ -231,14 +228,14 @@ exports.shareEvent = async (req, res) => {
         // Find the user to share with by email
         const userResult = await pool.request()
             .input('email', sql.NVarChar, email)
-            .query('SELECT id FROM Users WHERE email = @email');
+            .query('SELECT userId FROM Users WHERE email = @email');
 
         if (userResult.recordset.length === 0){
             console.warn('No user found with the provided email:', email);
             return res.status(404).json({ message: 'User to share with not found.' });
         }
 
-        const sharedUserId = userResult.recordset[0].id;
+        const sharedUserId = userResult.recordset[0].userId;
 
         // Check if the event is already shared with the user
         const shareCheck = await pool.request()
@@ -283,7 +280,7 @@ exports.attendEvent = async (req, res) => {
         // Check if the event exists
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
-            .query('SELECT * FROM Events WHERE id = @eventId');
+            .query('SELECT * FROM Events WHERE eventId = @eventId');
 
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);
@@ -333,16 +330,16 @@ exports.getInvites = async (req, res) => {
             .input('userId', sql.Int, userId)
             .query(`
                 SELECT 
-                    E.id as eventId, 
+                    E.eventId as eventId, 
                     E.title, 
                     E.description, 
                     E.date, 
                     E.location, 
-                    U.id as ownerId, 
+                    U.userId as ownerId, 
                     U.email as ownerEmail
                 FROM EventShares ES
-                JOIN Events E ON ES.eventId = E.id
-                JOIN Users U ON E.userId = U.id
+                JOIN Events E ON ES.eventId = E.eventId
+                JOIN Users U ON E.userId = U.userId
                 WHERE ES.sharedUserId = @userId
                 ORDER BY E.date ASC
             `);
