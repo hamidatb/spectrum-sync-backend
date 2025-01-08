@@ -6,6 +6,7 @@ const sql = require('mssql'); // SQL Server connection
 const connectToDatabase = require('../utils/dbConnection');
 const { validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
+const logger = require('../utils/logger'); 
 require('dotenv').config(); // Load environment variables from .env
 
 // Validate JWT Secret
@@ -17,9 +18,9 @@ if (!jwtSecret) {
 /**
  * (POST) Register a new user
  */
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
     const { username, email, password } = req.body;
-    console.log('Received registration request:', { username, email });
+    logger.log(`Received registration request: { username: ${username}, email: ${email} }`);
 
     // Validate required fields
     if (!validateFields(req, res, ['username', 'email', 'password'])) return;
@@ -28,26 +29,25 @@ exports.register = async (req, res) => {
         const pool = await connectToDatabase();
 
         // Check if user already exists
-        console.log(`Checking if user already exists with email: ${email}`);
+        logger.log(`Checking if user already exists with email: ${email}`);
 
         const userExistsResult = await pool.request()
             .input('email', sql.NVarChar, email)
             .query('SELECT userId FROM Users WHERE email = @email');
 
         if (userExistsResult.recordset.length > 0) {
-            console.warn(`Registration failed: User already exists with email ${email}`);
+            logger.warn(`Registration failed: User already exists with email ${email}`);
             return res.status(400).json({ message: 'User already exists' });
         }
 
         // Hash password
-        console.log('Hashing password...');
+        logger.log('Hashing password...');
         const saltRounds = 12; // Increased salt rounds for better security
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-        console.log('Password hashed successfully.');
+        logger.log('Password hashed successfully.');
 
         // Insert new user into the database
-        // Insert new user into the database
-        console.log('Inserting new user into the database...');
+        logger.log('Inserting new user into the database...');
         const insertResult = await pool.request()
             .input('username', sql.NVarChar, username)
             .input('email', sql.NVarChar, email)
@@ -58,17 +58,18 @@ exports.register = async (req, res) => {
                 VALUES (@username, @email, @passwordHash)
             `);
 
-        console.log('User inserted successfully.');
+        const newUser = insertResult.recordset[0];
+        logger.log(`User inserted successfully with userId: ${newUser.userId}`);
 
         // Create JWT token
-        console.log('Creating JWT token...');
+        logger.log('Creating JWT token...');
         const token = jwt.sign(
             { userId: newUser.userId },
             jwtSecret,
             { expiresIn: '2h' }
         );
-        
-        console.log('JWT token created successfully.');
+
+        logger.log('JWT token created successfully.');
 
         // Respond with token and user details
         res.status(201).json({
@@ -79,17 +80,17 @@ exports.register = async (req, res) => {
                 username: newUser.username,
                 email: newUser.email,
             },
-        });        
-        console.log('Registration successful.');
+        });
+        logger.log('Registration successful.');
     } catch (error) {
         handleError(error, res, 'Error during registration');
-    } 
+    }
 };
 
 /**
  * (POST) Authenticate user and get token
  */
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
     const { email, password } = req.body;
 
     // Validate required fields
@@ -99,37 +100,37 @@ exports.login = async (req, res) => {
         const pool = await connectToDatabase();
 
         // Find user by email
-        console.log(`Searching for user with email: ${email}`);
+        logger.log(`Searching for user with email: ${email}`);
         const userResult = await pool.request()
             .input('email', sql.NVarChar, email)
             .query('SELECT userId, username, email, passwordHash FROM Users WHERE email = @email');
 
         if (userResult.recordset.length === 0) {
-            console.warn(`Login failed: User not found with email ${email}`);
+            logger.warn(`Login failed: User not found with email ${email}`);
             return res.status(400).json({ message: 'Invalid credentials' }); // Generic message to prevent email enumeration
         }
 
         const user = userResult.recordset[0];
-        console.log(`User found: ${user.username} (userId: ${user.userId})`);
+        logger.log(`User found: ${user.username} (userId: ${user.userId})`);
 
         // Compare password
-        console.log('Comparing provided password with stored hash...');
+        logger.log('Comparing provided password with stored hash...');
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
-            console.warn(`Login failed: Invalid password for email ${email}`);
+            logger.warn(`Login failed: Invalid password for email ${email}`);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
-        console.log('Password matched successfully.');
+        logger.log('Password matched successfully.');
 
         // Create JWT token
-        console.log('Creating JWT token...');
+        logger.log('Creating JWT token...');
         const token = jwt.sign(
             { userId: user.userId },
             jwtSecret,
             { expiresIn: '2h' }
-        );        
+        );
 
-        console.log('JWT token created successfully.');
+        logger.log('JWT token created successfully.');
 
         // Respond with token and user details
         res.status(200).json({
@@ -141,8 +142,9 @@ exports.login = async (req, res) => {
                 email: user.email,
             },
         });
+        logger.log('Login successful.');
     } catch (error) {
-        console.error('Error during login:', error);
+        logger.error(`Error during login: ${error.message}`);
         res.status(500).json({ message: 'Server error', error: error.message });
-    } 
+    }
 };

@@ -1,19 +1,22 @@
+// controllers/eventController.js
+
 const sql = require('mssql');
 const connectToDatabase = require('../utils/dbConnection');
 const { validateUserId, validateEventId, validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
 const { ATTENDEE_STATUS } = require('../utils/constants');
+const logger = require('../utils/logger'); 
 
 /**
  * (POST) Create a new event
  */
-exports.createEvent = async (req, res) => {
+exports.createEvent = async (req, res, next) => {
     const { title, description, date, location } = req.body;
     const userId = req.user.userId;
 
-    console.log('Received request to create a new event:', { title, description, date, location });
+    logger.log(`Received request to create a new event: { title: ${title}, description: ${description}, date: ${date}, location: ${location} }`);
 
-    if (!validateUserId(req, res)) return; 
+    if (!validateUserId(req, res)) return;
 
     try {
         const pool = await connectToDatabase();
@@ -33,7 +36,7 @@ exports.createEvent = async (req, res) => {
             `);
 
         const newEvent = insertResult.recordset[0];
-        console.log('Event inserted successfully:', insertResult);
+        logger.log(`Event inserted successfully: ${JSON.stringify(newEvent)}`);
 
         // Add the creator as an attendee with status 'Attending'
         await pool.request()
@@ -42,6 +45,8 @@ exports.createEvent = async (req, res) => {
             .input('status', sql.NVarChar, ATTENDEE_STATUS.ATTENDING)
             .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @userId, @status)');
 
+        logger.log(`Added creator as attendee with status 'Attending' for eventId: ${newEvent.eventId}`);
+
         // Return the inserted event details
         res.status(201).json({
             message: 'Event created successfully',
@@ -49,44 +54,44 @@ exports.createEvent = async (req, res) => {
         });
     } catch (error) {
         handleError(error, res, 'Error creating event');
-    } 
+    }
 };
 
 /**
  * (GET) Retrieve all events for a user 
  */
-exports.getEvents = async (req, res) => {    
+exports.getEvents = async (req, res, next) => {    
     if (!validateUserId(req, res)) return;
 
     const userId = req.user.userId;
-    console.log('Received request to fetch events for user:', userId);
+    logger.log(`Received request to fetch events for userId: ${userId}`);
 
     try {
         const pool = await connectToDatabase();
 
         // Retrieve events using parameterized query
-        console.log('Fetching events from the database...');
+        logger.log('Fetching events from the database...');
         const result = await pool.request()
             .input('userId', sql.Int, userId)
             .query('SELECT * FROM Events WHERE userId = @userId ORDER BY date ASC');
         
-        console.log('Events fetched successfully:', result.recordset);
+        logger.log(`Events fetched successfully: ${JSON.stringify(result.recordset)}`);
         res.status(200).json(result.recordset);
     } catch (error) {
         handleError(error, res, 'Error fetching events');
-    } 
+    }
 };
 
 /**
  * (GET) Retrieve event details by id
  */
-exports.getEventById = async (req, res) => {
+exports.getEventById = async (req, res, next) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
     const userId = req.user.userId;
     const eventId = req.params.id;
-    console.log('Recieved request to get event details:', {eventId, userId});
+    logger.log(`Received request to get event details: { eventId: ${eventId}, userId: ${userId} }`);
 
     try {
         const pool = await connectToDatabase();
@@ -99,11 +104,11 @@ exports.getEventById = async (req, res) => {
             );
         
         if (eventDetails.recordset.length === 0) {
-            console.warn('No event found for the provided ID:', eventId);
+            logger.warn(`No event found for the provided ID: ${eventId}`);
             return res.status(404).json({ message: 'Event not found.' });
         }
 
-        console.log('Event details retrieved successfully:', eventDetails.recordset[0]);
+        logger.log(`Event details retrieved successfully: ${JSON.stringify(eventDetails.recordset[0])}`);
         res.status(200).json({
             message: 'Event details retrieved successfully',
             event: eventDetails.recordset[0],
@@ -116,12 +121,12 @@ exports.getEventById = async (req, res) => {
 /**
  * (PUT) Edit an event by ID
  */
-exports.updateEvent = async (req, res) => {
+exports.updateEvent = async (req, res, next) => {
     const { title, description, date, location } = req.body;
     const userId = req.user.userId;
     const eventId = req.params.id;
 
-    console.log('Received request to edit event:', { eventId, userId, title, description, date, location });
+    logger.log(`Received request to edit event: { eventId: ${eventId}, userId: ${userId}, title: ${title}, description: ${description}, date: ${date}, location: ${location} }`);
 
     // Validate required fields
     if (!validateFields(req, res, ['title', 'date', 'location'])) return;
@@ -138,7 +143,7 @@ exports.updateEvent = async (req, res) => {
             .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
         
         if (eventCheck.recordset.length === 0){
-            console.warn('No event found for the provided ID:', eventId);
+            logger.warn(`No event found for the provided ID: ${eventId}`);
             return res.status(404).json({ message: 'Event not found.' });
         }
 
@@ -154,11 +159,11 @@ exports.updateEvent = async (req, res) => {
                 SET title = @title, description = @description, date = @date, location = @location
                 WHERE eventId = @eventId;
         
-                SELECT * FROM Events WHERE eventId = SCOPE_IDENTITY() OR eventId = @eventId;
+                SELECT * FROM Events WHERE eventId = @eventId;
             `);
 
         const updatedEvent = updateResult.recordset[0];
-        console.log('Event updated successfully:', updatedEvent);
+        logger.log(`Event updated successfully: ${JSON.stringify(updatedEvent)}`);
 
         res.status(200).json({
             message: 'Event updated successfully',
@@ -172,11 +177,11 @@ exports.updateEvent = async (req, res) => {
 /**
  * (DELETE) Delete an event by ID
  */
-exports.deleteEvent = async (req, res) => {
+exports.deleteEvent = async (req, res, next) => {
     const userId = req.user.userId;
     const eventId = req.params.id;
 
-    console.log('Recieved request to delete event:', {eventId, userId});
+    logger.log(`Received request to delete event: { eventId: ${eventId}, userId: ${userId} }`);
 
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
@@ -191,7 +196,7 @@ exports.deleteEvent = async (req, res) => {
             .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
 
         if (eventCheck.recordset.length === 0){
-            console.warn('No event found for the provided ID:', eventId);
+            logger.warn(`No event found for the provided ID: ${eventId}`);
             return res.status(404).json({ message: 'Event not found.' });
         }
 
@@ -200,7 +205,7 @@ exports.deleteEvent = async (req, res) => {
             .input('eventId', sql.Int, eventId)
             .query('DELETE FROM Events WHERE eventId = @eventId');
 
-        console.log('Event deleted successfully:', eventId);
+        logger.log(`Event deleted successfully: ${eventId}`);
         res.status(200).json({ message: 'Event deleted successfully.' });
     } catch (error) {
         handleError(error, res, 'Error deleting event');
@@ -210,12 +215,12 @@ exports.deleteEvent = async (req, res) => {
 /**
  * (POST) Share an event with other users
  */
-exports.shareEvent = async (req, res) => {
+exports.shareEvent = async (req, res, next) => {
     const { email } = req.body;
     const userId = req.user.userId;
     const eventId = req.params.id;
 
-    console.log('Received request to share event:', { eventId, userId, email });
+    logger.log(`Received request to share event: { eventId: ${eventId}, userId: ${userId}, email: ${email} }`);
 
     // Validate required fields
     if (!validateFields(req, res, ['email'])) return;
@@ -232,7 +237,7 @@ exports.shareEvent = async (req, res) => {
             .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
 
         if (eventCheck.recordset.length === 0){
-            console.warn('No event found for the provided ID:', eventId);
+            logger.warn(`No event found for the provided ID: ${eventId}`);
             return res.status(404).json({ message: 'Event not found.' });
         }
 
@@ -242,7 +247,7 @@ exports.shareEvent = async (req, res) => {
             .query('SELECT userId FROM Users WHERE email = @email');
 
         if (userResult.recordset.length === 0){
-            console.warn('No user found with the provided email:', email);
+            logger.warn(`No user found with the provided email: ${email}`);
             return res.status(404).json({ message: 'User to share with not found.' });
         }
 
@@ -255,7 +260,7 @@ exports.shareEvent = async (req, res) => {
             .query('SELECT * FROM EventAttendees WHERE eventId = @eventId AND userId = @sharedUserId');
 
         if (shareCheck.recordset.length > 0){
-            console.warn('Event already shared with user:', email);
+            logger.warn(`Event already shared with user: ${email}`);
             return res.status(400).json({ message: 'Event already shared with this user.' });
         }
 
@@ -265,7 +270,7 @@ exports.shareEvent = async (req, res) => {
             .input('sharedUserId', sql.Int, sharedUserId)
             .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @sharedUserId, \'Pending\')');
 
-        console.log(`Event ${eventId} shared with user ID ${sharedUserId} (${email}) successfully.`);
+        logger.log(`Event ${eventId} shared with user ID ${sharedUserId} (${email}) successfully.`);
         res.status(200).json({ message: 'Event shared successfully.' });
     } catch (error) {
         handleError(error, res, 'Error sharing event');
@@ -275,12 +280,12 @@ exports.shareEvent = async (req, res) => {
 /**
  * (POST) RSVP to an event
  */
-exports.attendEvent = async (req, res) => {
+exports.attendEvent = async (req, res, next) => {
     const userId = req.user.userId;
     const eventId = req.params.id;
     const { status } = req.body; // Expecting 'Attending' or 'Not Attending'
 
-    console.log('Received request to RSVP to event:', { eventId, userId, status });
+    logger.log(`Received request to RSVP to event: { eventId: ${eventId}, userId: ${userId}, status: ${status} }`);
 
     // Validate user and event IDs
     if (!validateUserId(req, res)) return;
@@ -288,7 +293,7 @@ exports.attendEvent = async (req, res) => {
 
     // Validate status
     if (!status || !Object.values(ATTENDEE_STATUS).includes(status)) {
-        console.warn('Invalid RSVP status provided:', status);
+        logger.warn(`Invalid RSVP status provided: ${status}`);
         return res.status(400).json({ message: 'Invalid RSVP status. Allowed values are "Attending" and "Not Attending".' });
     }
 
@@ -301,7 +306,7 @@ exports.attendEvent = async (req, res) => {
             .query('SELECT * FROM Events WHERE eventId = @eventId');
 
         if (eventCheck.recordset.length === 0){
-            console.warn('No event found for the provided ID:', eventId);
+            logger.warn(`No event found for the provided ID: ${eventId}`);
             return res.status(404).json({ message: 'Event not found.' });
         }
 
@@ -314,7 +319,7 @@ exports.attendEvent = async (req, res) => {
         if (attendeeCheck.recordset.length > 0){
             const currentStatus = attendeeCheck.recordset[0].status;
             if (currentStatus === ATTENDEE_STATUS.ATTENDING || currentStatus === ATTENDEE_STATUS.NOT_ATTENDING){
-                console.warn('User has already RSVPed to the event:', eventId);
+                logger.warn(`User has already RSVPed to the event: ${eventId} with status: ${currentStatus}`);
                 return res.status(400).json({ message: `You have already RSVPed as "${currentStatus}".` });
             } else if (currentStatus === ATTENDEE_STATUS.PENDING){
                 // Update status to the new value
@@ -324,7 +329,7 @@ exports.attendEvent = async (req, res) => {
                     .input('status', sql.NVarChar, status)
                     .query('UPDATE EventAttendees SET status = @status WHERE eventId = @eventId AND userId = @userId');
 
-                console.log(`User ${userId} updated RSVP to "${status}" for event ${eventId} successfully.`);
+                logger.log(`User ${userId} updated RSVP to "${status}" for event ${eventId} successfully.`);
                 return res.status(200).json({ message: `RSVP updated to "${status}".` });
             }
         }
@@ -336,7 +341,7 @@ exports.attendEvent = async (req, res) => {
             .input('status', sql.NVarChar, status)
             .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @userId, @status)');
 
-        console.log(`User ${userId} RSVPed as "${status}" to event ${eventId} successfully.`);
+        logger.log(`User ${userId} RSVPed as "${status}" to event ${eventId} successfully.`);
         res.status(200).json({ message: `RSVP as "${status}" successful.` });
     } catch (error) {
         handleError(error, res, 'Error RSVPing to event');
@@ -346,10 +351,10 @@ exports.attendEvent = async (req, res) => {
 /**
  * (GET) Get all event invitations for the authenticated user
  */
-exports.getInvites = async (req, res) => {
+exports.getInvites = async (req, res, next) => {
     const userId = req.user.userId;
 
-    console.log('Received request to get all invitation details for user:', userId);
+    logger.log(`Received request to get all invitation details for userId: ${userId}`);
 
     // Validate user ID
     if (!validateUserId(req, res)) return;
@@ -377,7 +382,7 @@ exports.getInvites = async (req, res) => {
                 ORDER BY E.date ASC
             `);
 
-        console.log(`Fetched ${invitesResult.recordset.length} invitation(s) successfully.`);
+        logger.log(`Fetched ${invitesResult.recordset.length} invitation(s) successfully.`);
         res.status(200).json({
             message: 'Invitations retrieved successfully',
             invitations: invitesResult.recordset

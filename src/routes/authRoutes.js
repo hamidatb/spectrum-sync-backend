@@ -5,7 +5,8 @@ const authController = require('../controllers/authController');
 const logger = require('../utils/logger');
 const loggerMiddleware = require('../middleware/loggerMiddleware');
 
-// Apply the logging middleware to all routes in this router
+/**  
+ * Apply the logging middleware to all routes in this router */
 router.use(loggerMiddleware);
 
 /**
