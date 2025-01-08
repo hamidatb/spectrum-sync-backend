@@ -58,4 +58,24 @@ router.post('/login', (req, res, next) => {
     authController.login(req, res, next);
 });
 
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Log out the user and invalidate their token
+ * @access  Private
+ * 
+ * Example Request:
+ * POST /api/auth/logout
+ * 
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ * 
+ * No request body required.
+ */
+router.post('/logout', (req, res, next) => {
+    logger.log('POST /api/auth/logout - User logout attempt');
+    authController.logout(req, res, next);
+});
+
 module.exports = router;
