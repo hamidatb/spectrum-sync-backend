@@ -24,8 +24,12 @@ exports.createEvent = async (req, res) => {
             .input('date', sql.DateTime, date)
             .input('location', sql.NVarChar, location)
             .input('userId', sql.Int, userId)
-            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId) OUTPUT INSERTED.*');
-
+            .query(`
+                INSERT INTO Events (title, description, date, location, userId) 
+                VALUES (@title, @description, @date, @location, @userId);
+        
+                SELECT * FROM Events WHERE eventId = SCOPE_IDENTITY();
+            `);
 
         const newEvent = insertResult.recordset[0];
         console.log('Event inserted successfully:', insertResult);
@@ -138,10 +142,11 @@ exports.updateEvent = async (req, res) => {
             .input('location', sql.NVarChar, location)
             .input('eventId', sql.Int, eventId)
             .query(`
-                UPDATE Events 
-                SET title = @title, description = @description, date = @date, location = @location 
-                WHERE eventId = @eventId
-                OUTPUT INSERTED.*
+                UPDATE Events
+                SET title = @title, description = @description, date = @date, location = @location
+                WHERE eventId = @eventId;
+        
+                SELECT * FROM Events WHERE eventId = SCOPE_IDENTITY() OR eventId = @eventId;
             `);
 
         const updatedEvent = updateResult.recordset[0];
