@@ -12,7 +12,6 @@ exports.createEvent = async (req, res) => {
 
     console.log('Received request to create a new event:', { title, description, date, location });
 
-    if (!validateFields(req, res, ['title', 'date', 'location'])) return;
     if (!validateUserId(req, res)) return; 
 
     try {
@@ -73,7 +72,7 @@ exports.getEventById = async (req, res) => {
     if (!validateEventId(req, res)) return;
     
     const userId = req.user.userId;
-    const eventId = red.params.id;
+    const eventId = req.params.id;
     console.log('Recieved request to get event details:', {eventId, userId});
 
     try {
