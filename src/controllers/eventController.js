@@ -2,6 +2,7 @@ const sql = require('mssql');
 const connectToDatabase = require('../utils/dbConnection');
 const { validateUserId, validateEventId, validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
+const { ATTENDEE_STATUS } = require('../utils/constants');
 
 /**
  * (POST) Create a new event
@@ -202,6 +203,9 @@ exports.deleteEvent = async (req, res) => {
 /**
  * (POST) Share an event with other users
  */
+/**
+ * (POST) Share an event with other users
+ */
 exports.shareEvent = async (req, res) => {
     const { email } = req.body;
     const userId = req.user.userId;
@@ -221,9 +225,7 @@ exports.shareEvent = async (req, res) => {
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query(
-                'SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId'
-            );
+            .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
 
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);
@@ -246,18 +248,18 @@ exports.shareEvent = async (req, res) => {
         const shareCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('sharedUserId', sql.Int, sharedUserId)
-            .query('SELECT * FROM EventShares WHERE eventId = @eventId AND sharedUserId = @sharedUserId');
+            .query('SELECT * FROM EventAttendees WHERE eventId = @eventId AND userId = @sharedUserId');
 
         if (shareCheck.recordset.length > 0){
             console.warn('Event already shared with user:', email);
             return res.status(400).json({ message: 'Event already shared with this user.' });
         }
 
-        // Share the event
+        // Share the event by adding to EventAttendees with status 'Pending'
         await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('sharedUserId', sql.Int, sharedUserId)
-            .query('INSERT INTO EventShares (eventId, sharedUserId) VALUES (@eventId, @sharedUserId)');
+            .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @sharedUserId, \'Pending\')');
 
         console.log(`Event ${eventId} shared with user ID ${sharedUserId} (${email}) successfully.`);
         res.status(200).json({ message: 'Event shared successfully.' });
@@ -272,12 +274,19 @@ exports.shareEvent = async (req, res) => {
 exports.attendEvent = async (req, res) => {
     const userId = req.user.userId;
     const eventId = req.params.id;
+    const { status } = req.body; // Expecting 'Attending' or 'Not Attending'
 
-    console.log('Received request to RSVP to event:', { eventId, userId });
+    console.log('Received request to RSVP to event:', { eventId, userId, status });
 
     // Validate user and event IDs
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
+
+    // Validate status
+    if (!status || !Object.values(ATTENDEE_STATUS).includes(status)) {
+        console.warn('Invalid RSVP status provided:', status);
+        return res.status(400).json({ message: 'Invalid RSVP status. Allowed values are "Attending" and "Not Attending".' });
+    }
 
     try {
         const pool = await connectToDatabase();
@@ -292,25 +301,39 @@ exports.attendEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found.' });
         }
 
-        // Check if the user has already RSVPed
-        const rsvpCheck = await pool.request()
+        // Check if the user is already an attendee
+        const attendeeCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('SELECT * FROM RSVPs WHERE eventId = @eventId AND userId = @userId');
+            .query('SELECT * FROM EventAttendees WHERE eventId = @eventId AND userId = @userId');
 
-        if (rsvpCheck.recordset.length > 0){
-            console.warn('User has already RSVPed to the event:', eventId);
-            return res.status(400).json({ message: 'User has already RSVPed to this event.' });
+        if (attendeeCheck.recordset.length > 0){
+            const currentStatus = attendeeCheck.recordset[0].status;
+            if (currentStatus === ATTENDEE_STATUS.ATTENDING || currentStatus === ATTENDEE_STATUS.NOT_ATTENDING){
+                console.warn('User has already RSVPed to the event:', eventId);
+                return res.status(400).json({ message: `You have already RSVPed as "${currentStatus}".` });
+            } else if (currentStatus === ATTENDEE_STATUS.PENDING){
+                // Update status to the new value
+                await pool.request()
+                    .input('eventId', sql.Int, eventId)
+                    .input('userId', sql.Int, userId)
+                    .input('status', sql.NVarChar, status)
+                    .query('UPDATE EventAttendees SET status = @status WHERE eventId = @eventId AND userId = @userId');
+
+                console.log(`User ${userId} updated RSVP to "${status}" for event ${eventId} successfully.`);
+                return res.status(200).json({ message: `RSVP updated to "${status}".` });
+            }
         }
 
-        // Add RSVP
+        // If not already an attendee, add with the specified status
         await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('INSERT INTO RSVPs (eventId, userId) VALUES (@eventId, @userId)');
+            .input('status', sql.NVarChar, status)
+            .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @userId, @status)');
 
-        console.log(`User ${userId} RSVPed to event ${eventId} successfully.`);
-        res.status(200).json({ message: 'RSVP successful.' });
+        console.log(`User ${userId} RSVPed as "${status}" to event ${eventId} successfully.`);
+        res.status(200).json({ message: `RSVP as "${status}" successful.` });
     } catch (error) {
         handleError(error, res, 'Error RSVPing to event');
     }
@@ -330,7 +353,7 @@ exports.getInvites = async (req, res) => {
     try {
         const pool = await connectToDatabase();
 
-        // Retrieve invitations (shared events)
+        // Retrieve invitations (shared events with status 'Pending')
         const invitesResult = await pool.request()
             .input('userId', sql.Int, userId)
             .query(`
@@ -342,10 +365,10 @@ exports.getInvites = async (req, res) => {
                     E.location, 
                     U.userId as ownerId, 
                     U.email as ownerEmail
-                FROM EventShares ES
-                JOIN Events E ON ES.eventId = E.eventId
+                FROM EventAttendees EA
+                JOIN Events E ON EA.eventId = E.eventId
                 JOIN Users U ON E.userId = U.userId
-                WHERE ES.sharedUserId = @userId
+                WHERE EA.userId = @userId AND EA.status = 'Pending'
                 ORDER BY E.date ASC
             `);
 
