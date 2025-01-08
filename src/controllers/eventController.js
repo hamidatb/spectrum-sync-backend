@@ -123,7 +123,7 @@ exports.updateEvent = async (req, res) => {
         const eventCheck = await pool.request()
             .input('eventId', sql.Int, eventId)
             .input('userId', sql.Int, userId)
-            .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId) OUTPUT INSERTED.*');
+            .query('SELECT * FROM Events WHERE eventId = @eventId AND userId = @userId');
         
         if (eventCheck.recordset.length === 0){
             console.warn('No event found for the provided ID:', eventId);

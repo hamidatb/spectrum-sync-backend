@@ -6,47 +6,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 // Protect all routes below
 router.use(authMiddleware);
 
-/**
- * @route   POST /api/events
- * @desc    Create a new event
- * @access  Private
- * 
- * Example Request:
- * POST /api/events
- * 
- * Headers:
- * {
- *   "Authorization": "Bearer <your_token>",
- *   "Content-Type": "application/json"
- * }
- * 
- * Body:
- * {
- *   "title": "Team Meeting",
- *   "description": "Monthly sync-up with the team",
- *   "date": "2025-01-15T14:30:00Z",
- *   "location": "Zoom"
- * }
- */
-router.post('/', eventController.createEvent);
-
-/**
- * @route   GET /api/events
- * @desc    Get all events for the authenticated user
- * @access  Private
- * 
- * Example Request:
- * GET /api/events
- * 
- * Headers:
- * {
- *   "Authorization": "Bearer <your_token>"
- * }
- * 
- * No request body required.
- */
-router.get('/', eventController.getEvents);
-
+// define routes from most to least specific to prevent accidental matches
 /**
  * @route   GET /api/events/:id
  * @desc    Get event details by ID
@@ -159,5 +119,46 @@ router.post('/:id/attend', eventController.attendEvent);
  * No request body required.
  */
 router.get('/invites', eventController.getInvites);
+
+/**
+ * @route   POST /api/events
+ * @desc    Create a new event
+ * @access  Private
+ * 
+ * Example Request:
+ * POST /api/events
+ * 
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>",
+ *   "Content-Type": "application/json"
+ * }
+ * 
+ * Body:
+ * {
+ *   "title": "Team Meeting",
+ *   "description": "Monthly sync-up with the team",
+ *   "date": "2025-01-15T14:30:00Z",
+ *   "location": "Zoom"
+ * }
+ */
+router.post('/', eventController.createEvent);
+
+/**
+ * @route   GET /api/events
+ * @desc    Get all events for the authenticated user
+ * @access  Private
+ * 
+ * Example Request:
+ * GET /api/events
+ * 
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ * 
+ * No request body required.
+ */
+router.get('/', eventController.getEvents);
 
 module.exports = router;
