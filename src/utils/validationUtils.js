@@ -28,7 +28,7 @@ const validateFields = (req, res, requiredFields) => {
  * @returns {Boolean} - Returns true if userId is valid, otherwise sends a 401 response.
  */
 const validateUserId = (req, res) => {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     if (!userId) {
         console.warn('User ID is missing from the request. Authorization failed.');
         res.status(401).json({ message: 'Unauthorized. Please log in again.' });
