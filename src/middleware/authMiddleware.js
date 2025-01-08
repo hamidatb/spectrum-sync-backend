@@ -25,7 +25,7 @@ const authMiddleware = (req, res, next) => {
         console.log('Token verified successfully:', decoded);
 
         // Attach the decoded user to the request object
-        req.user = decoded;
+        req.user = { userId: decoded.userId };
         next(); // Proceed to the next middleware or route handler
 
     } catch (error) {

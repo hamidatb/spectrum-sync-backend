@@ -63,7 +63,7 @@ exports.register = async (req, res) => {
         // Create JWT token
         console.log('Creating JWT token...');
         const token = jwt.sign(
-            { id: newUser.userId },
+            { userId: newUser.userId },
             jwtSecret,
             { expiresIn: '2h' }
         );
@@ -75,7 +75,7 @@ exports.register = async (req, res) => {
             message: 'Registration successful',
             token,
             user: {
-                id: newUser.userId,
+                userId: newUser.userId,
                 username: newUser.username,
                 email: newUser.email,
             },
@@ -110,7 +110,7 @@ exports.login = async (req, res) => {
         }
 
         const user = userResult.recordset[0];
-        console.log(`User found: ${user.username} (ID: ${user.userId})`);
+        console.log(`User found: ${user.username} (userId: ${user.userId})`);
 
         // Compare password
         console.log('Comparing provided password with stored hash...');
@@ -124,7 +124,7 @@ exports.login = async (req, res) => {
         // Create JWT token
         console.log('Creating JWT token...');
         const token = jwt.sign(
-            { id: user.userId },
+            { userId: user.userId },
             jwtSecret,
             { expiresIn: '2h' }
         );        
@@ -136,7 +136,7 @@ exports.login = async (req, res) => {
             message: 'Login successful',
             token,
             user: {
-                id: user.userId,
+                userId: user.userId,
                 username: user.username,
                 email: user.email,
             },
