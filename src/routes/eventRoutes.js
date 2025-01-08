@@ -13,8 +13,10 @@ router.use(loggerMiddleware);
 // Protect all routes below with authentication middleware
 router.use(authMiddleware);
 
-// Define routes from most to least specific to prevent accidental matches
-// Define static routes (/invites, /) before dynamic routes (/:id) to prevent accidental matching
+/* Routing structure:
+- Define routes from most to least specific to prevent accidental matches
+- Define static routes (/invites, /) before dynamic routes (/:id) to prevent accidental matching
+*/
 
 // Static Routes
 
