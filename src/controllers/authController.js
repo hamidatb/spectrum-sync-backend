@@ -110,7 +110,7 @@ exports.login = async (req, res) => {
         }
 
         const user = userResult.recordset[0];
-        console.log(`User found: ${user.username} (ID: ${user.id})`);
+        console.log(`User found: ${user.username} (ID: ${user.userId})`);
 
         // Compare password
         console.log('Comparing provided password with stored hash...');
