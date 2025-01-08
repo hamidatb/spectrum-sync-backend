@@ -35,6 +35,13 @@ exports.createEvent = async (req, res) => {
         const newEvent = insertResult.recordset[0];
         console.log('Event inserted successfully:', insertResult);
 
+        // Add the creator as an attendee with status 'Attending'
+        await pool.request()
+            .input('eventId', sql.Int, newEvent.eventId)
+            .input('userId', sql.Int, userId)
+            .input('status', sql.NVarChar, ATTENDEE_STATUS.ATTENDING)
+            .query('INSERT INTO EventAttendees (eventId, userId, status) VALUES (@eventId, @userId, @status)');
+
         // Return the inserted event details
         res.status(201).json({
             message: 'Event created successfully',
@@ -203,9 +210,6 @@ exports.deleteEvent = async (req, res) => {
 /**
  * (POST) Share an event with other users
  */
-/**
- * (POST) Share an event with other users
- */
 exports.shareEvent = async (req, res) => {
     const { email } = req.body;
     const userId = req.user.userId;
@@ -356,6 +360,7 @@ exports.getInvites = async (req, res) => {
         // Retrieve invitations (shared events with status 'Pending')
         const invitesResult = await pool.request()
             .input('userId', sql.Int, userId)
+            .input('status', sql.NVarChar, ATTENDEE_STATUS.PENDING)
             .query(`
                 SELECT 
                     E.eventId as eventId, 
@@ -368,7 +373,7 @@ exports.getInvites = async (req, res) => {
                 FROM EventAttendees EA
                 JOIN Events E ON EA.eventId = E.eventId
                 JOIN Users U ON E.userId = U.userId
-                WHERE EA.userId = @userId AND EA.status = 'Pending'
+                WHERE EA.userId = @userId AND EA.status = @status
                 ORDER BY E.date ASC
             `);
 
