@@ -162,7 +162,6 @@ exports.updateEvent = async (req, res) => {
     }
 };
 
-
 /**
  * (DELETE) Delete an event by ID
  */
