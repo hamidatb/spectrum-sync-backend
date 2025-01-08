@@ -15,10 +15,7 @@ if (!jwtSecret) {
 exports.register = async (req, res) => {
     const { username, email, password } = req.body;
 
-    // Basic validation
-    if (!username || !email || !password) {
-        return res.status(400).json({ message: 'Please enter all fields (username, email, and password).' });
-    }
+    if (!validateFields(req, res, ['username', 'email', 'password'])) return;
 
     try {
         const pool = await connectToDatabase();
@@ -26,7 +23,7 @@ exports.register = async (req, res) => {
         // Check if user already exists
         console.log(`Checking if user already exists with email: ${email}`);
         const result = await pool.request()
-            .input('email', sql.VarChar, email)
+            .input('email', sql.NVarChar, email)
             .query('SELECT * FROM Users WHERE email = @email');
 
         if (result.recordset.length > 0) {
@@ -43,9 +40,9 @@ exports.register = async (req, res) => {
         // Insert new user into the database
         console.log('Inserting new user into the database...');
         await pool.request()
-            .input('username', sql.VarChar, username)
-            .input('email', sql.VarChar, email)
-            .input('passwordHash', sql.VarChar, hashedPassword)
+            .input('username', sql.NVarChar, username)
+            .input('email', sql.NVarChar, email)
+            .input('passwordHash', sql.NVarChar, hashedPassword)
             .query(
                 'INSERT INTO Users (username, email, passwordHash) VALUES (@username, @email, @passwordHash)'
             );
@@ -55,19 +52,19 @@ exports.register = async (req, res) => {
         // Retrieve the inserted user
         console.log('Retrieving the newly inserted user...');
         const userResult = await pool.request()
-            .input('email', sql.VarChar, email)
+            .input('email', sql.NVarChar, email)
             .query('SELECT * FROM Users WHERE email = @email');
 
         const user = userResult.recordset[0];
 
         // Create JWT token
         console.log('Creating JWT token...');
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         res.status(201).json({
             token,
             user: {
-                id: user.id,
+                id: user.userId,
                 username: user.username,
                 email: user.email,
             },
@@ -84,9 +81,8 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     // Basic validation
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Please enter all fields (email, password).' });
-    }
+
+    if (!validateFields(req, res, ['email', 'password'])) return;
 
     try {
         const pool = await connectToDatabase();
@@ -94,7 +90,7 @@ exports.login = async (req, res) => {
         // Find user by email
         console.log(`Searching for user with email: ${email}`);
         const result = await pool.request()
-            .input('email', sql.VarChar, email)
+            .input('email', sql.NVarChar, email)
             .query('SELECT * FROM Users WHERE email = @email');
 
         if (result.recordset.length === 0) {
@@ -106,7 +102,7 @@ exports.login = async (req, res) => {
 
         // Compare password
         console.log('Comparing password...');
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             console.log('Invalid credentials.');
             return res.status(400).json({ message: 'Invalid credentials' });
@@ -114,12 +110,12 @@ exports.login = async (req, res) => {
 
         // Create JWT token
         console.log('Creating JWT token...');
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         res.json({
             token,
             user: {
-                id: user.id,
+                id: user.userId,
                 username: user.username,
                 email: user.email,
             },

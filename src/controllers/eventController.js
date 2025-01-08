@@ -10,17 +10,17 @@ exports.createEvent = async (req, res) => {
     if (!validateUserId(req, res)) return; 
 
     const { title, description, date, location } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     try {
         const pool = await connectToDatabase();
 
         // Insert new event
         const insertResult = await pool.request()
-            .input('title', sql.VarChar, title)
-            .input('description', sql.VarChar, description || null)
+            .input('title', sql.NVarChar, title)
+            .input('description', sql.NVarChar, description || null)
             .input('date', sql.DateTime, date)
-            .input('location', sql.VarChar, location)
+            .input('location', sql.NVarChar, location)
             .input('userId', sql.Int, userId)
             .query('INSERT INTO Events (title, description, date, location, userId) VALUES (@title, @description, @date, @location, @userId)');
 
@@ -33,7 +33,7 @@ exports.createEvent = async (req, res) => {
                 description,
                 date,
                 location,
-                userId: req.user.id
+                userId: req.user.userId
             },
             insertResult: insertResult.recordset
         });
@@ -50,7 +50,7 @@ exports.createEvent = async (req, res) => {
 exports.getEvents = async (req, res) => {    
     if (!validateUserId(req, res)) return;
 
-    const userId = req.user.id;
+    const userId = req.user.userId;
     console.log('Received request to fetch events for user:', userId);
 
     try {
@@ -78,7 +78,7 @@ exports.getEventById = async (req, res) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const eventId = red.params.id;
     console.log('Recieved request to get event details:', {eventId, userId});
 
@@ -114,7 +114,7 @@ exports.updateEvent = async (req, res) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const eventId = red.params.id;
     console.log('Recieved request to edit event}:', {eventId, userId});
 };
@@ -124,7 +124,7 @@ exports.deleteEvent = async (req, res) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const eventId = red.params.id;
     console.log('Recieved request to delete event:', {eventId, userId});
 };
@@ -134,7 +134,7 @@ exports.shareEvent = async (req, res) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const eventId = red.params.id;
     console.log('Recieved request to share event details:', {eventId, userId});
 };
@@ -144,7 +144,7 @@ exports.attendEvent = async (req, res) => {
     if (!validateUserId(req, res)) return;
     if (!validateEventId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const eventId = red.params.id;
     console.log('Recieved request to RSVP to event:', {eventId, userId});
 };
@@ -153,6 +153,6 @@ exports.attendEvent = async (req, res) => {
 exports.getInvites = async (req, res) => {
     if (!validateUserId(req, res)) return;
     
-    const userId = req.user.id;
+    const userId = req.user.userId;
     console.log('Recieved request to get all inviation details of user: ', userId);
 }; 
