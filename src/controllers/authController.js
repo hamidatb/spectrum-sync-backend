@@ -29,9 +29,10 @@ exports.register = async (req, res) => {
 
         // Check if user already exists
         console.log(`Checking if user already exists with email: ${email}`);
-        const result = await pool.request()
+
+        const userExistsResult = await pool.request()
             .input('email', sql.NVarChar, email)
-            .query('SELECT * FROM Users WHERE email = @email');
+            .query('SELECT userId FROM Users WHERE email = @email');
 
         if (userExistsResult.recordset.length > 0) {
             console.warn(`Registration failed: User already exists with email ${email}`);
@@ -53,7 +54,7 @@ exports.register = async (req, res) => {
             .input('passwordHash', sql.NVarChar, hashedPassword)
             .query(`
                 INSERT INTO Users (username, email, passwordHash) 
-                OUTPUT INSERTED.id, INSERTED.username, INSERTED.email 
+                OUTPUT INSERTED.userId, INSERTED.username, INSERTED.email 
                 VALUES (@username, @email, @passwordHash)
             `);
 
@@ -62,11 +63,11 @@ exports.register = async (req, res) => {
         // Create JWT token
         console.log('Creating JWT token...');
         const token = jwt.sign(
-            { id: newUser.id },
+            { id: newUser.userId },
             jwtSecret,
-            { expiresIn: '2h' } 
+            { expiresIn: '2h' }
         );
-
+        
         console.log('JWT token created successfully.');
 
         // Respond with token and user details
@@ -74,11 +75,11 @@ exports.register = async (req, res) => {
             message: 'Registration successful',
             token,
             user: {
-                id: newUser.id,
+                id: newUser.userId,
                 username: newUser.username,
                 email: newUser.email,
             },
-        });
+        });        
         console.log('Registration successful.');
     } catch (error) {
         handleError(error, res, 'Error during registration');
@@ -101,7 +102,7 @@ exports.login = async (req, res) => {
         console.log(`Searching for user with email: ${email}`);
         const userResult = await pool.request()
             .input('email', sql.NVarChar, email)
-            .query('SELECT id, username, email, passwordHash FROM Users WHERE email = @email');
+            .query('SELECT userId, username, email, passwordHash FROM Users WHERE email = @email');
 
         if (userResult.recordset.length === 0) {
             console.warn(`Login failed: User not found with email ${email}`);
@@ -123,10 +124,10 @@ exports.login = async (req, res) => {
         // Create JWT token
         console.log('Creating JWT token...');
         const token = jwt.sign(
-            { id: user.id },
+            { id: user.userId },
             jwtSecret,
-            { expiresIn: '2h' } // Extended token expiration
-        );
+            { expiresIn: '2h' }
+        );        
 
         console.log('JWT token created successfully.');
 
@@ -135,7 +136,7 @@ exports.login = async (req, res) => {
             message: 'Login successful',
             token,
             user: {
-                id: user.id,
+                id: user.userId,
                 username: user.username,
                 email: user.email,
             },
