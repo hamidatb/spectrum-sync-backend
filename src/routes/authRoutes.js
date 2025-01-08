@@ -1,6 +1,12 @@
+// routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const logger = require('../utils/logger');
+const loggerMiddleware = require('../middleware/loggerMiddleware');
+
+// Apply the logging middleware to all routes in this router
+router.use(loggerMiddleware);
 
 /**
  * @route   POST /api/auth/register
@@ -22,7 +28,10 @@ const authController = require('../controllers/authController');
  *   "password": "SecureP@ssw0rd!"
  * }
  */
-router.post('/register', authController.register);
+router.post('/register', (req, res, next) => {
+    logger.log('POST /api/auth/register - User registration attempt');
+    authController.register(req, res, next);
+});
 
 /**
  * @route   POST /api/auth/login
@@ -43,6 +52,9 @@ router.post('/register', authController.register);
  *   "password": "SecureP@ssw0rd!"
  * }
  */
-router.post('/login', authController.login);
+router.post('/login', (req, res, next) => {
+    logger.log('POST /api/auth/login - User login attempt');
+    authController.login(req, res, next);
+});
 
 module.exports = router;
