@@ -1,21 +1,15 @@
+// utils/validationUtils.js
+
 /**
  * Utility function to validate the presence of required fields in the request body.
  * @param {Object} req - The Express request object.
  * @param {Object} res - The Express response object.
- * @param {Array} requiredFields - An array of required field names to check.
+ * @param {Array<string>} requiredFields - An array of required field names to check.
  * @returns {Boolean} - Returns true if all required fields are present, otherwise sends a 400 response.
  */
 const validateFields = (req, res, requiredFields) => {
-    const missingFields = [];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
 
-    // Check for missing fields
-    requiredFields.forEach((field) => {
-        if (!req.body[field]) {
-            missingFields.push(field);
-        }
-    });
-
-    // If there are missing fields, return a 400 response
     if (missingFields.length > 0) {
         console.warn('Missing required fields:', missingFields);
         res.status(400).json({
@@ -28,7 +22,7 @@ const validateFields = (req, res, requiredFields) => {
 };
 
 /**
- * Utility function to validate the user ID.
+ * Utility function to validate the user ID from the authenticated request.
  * @param {Object} req - The Express request object.
  * @param {Object} res - The Express response object.
  * @returns {Boolean} - Returns true if userId is valid, otherwise sends a 401 response.
@@ -44,7 +38,7 @@ const validateUserId = (req, res) => {
 };
 
 /**
- * Utility function to validate the event ID.
+ * Utility function to validate the event ID from the request parameters.
  * @param {Object} req - The Express request object.
  * @param {Object} res - The Express response object.
  * @returns {Boolean} - Returns true if eventId is valid, otherwise sends a 400 response.
@@ -54,6 +48,11 @@ const validateEventId = (req, res) => {
     if (!eventId) {
         console.warn('Event ID is missing from the request.');
         res.status(400).json({ message: 'Event ID is required.' });
+        return false;
+    }
+    if (isNaN(parseInt(eventId, 10))) {
+        console.warn('Invalid Event ID format:', eventId);
+        res.status(400).json({ message: 'Event ID must be a valid number.' });
         return false;
     }
     return true;
