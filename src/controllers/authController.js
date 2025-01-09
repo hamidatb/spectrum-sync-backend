@@ -7,7 +7,7 @@ const connectToDatabase = require('../utils/dbConnection');
 const { validateUserId, validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
 const logger = require('../utils/logger'); 
-const { hashToken } = require('../utils/hashUtils');
+const { hashToken } = require('../utils/hashToken');
 require('dotenv').config(); // Load environment variables from .env
 
 // Validate JWT Secret

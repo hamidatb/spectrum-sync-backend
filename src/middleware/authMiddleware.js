@@ -4,6 +4,7 @@ const connectToDatabase = require('../utils/dbConnection');
 const logger = require('../utils/logger');
 const handleError = require('../utils/errorHandler');
 require('dotenv').config();
+const { hashToken } = require('../utils/hashToken');
 
 const authMiddleware = async (req, res, next) => {
     try {
