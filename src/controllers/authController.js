@@ -70,7 +70,6 @@ exports.register = async (req, res, next) => {
 
         const newUser = userDetailsResult.recordset[0];
 
-        // Create JWT token
         logger.log('Creating JWT token...');
         const token = jwt.sign(
             { userId: newUser.userId },
