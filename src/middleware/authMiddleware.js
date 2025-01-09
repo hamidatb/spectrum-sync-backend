@@ -35,8 +35,7 @@ const authMiddleware = async (req, res, next) => {
             .query('SELECT * FROM TokenBlacklist WHERE token = @token');
 
         if (blacklistCheck.recordset.length > 0) {
-            logger.warn(`logger: Token is blacklisted: ${token}`);
-            console.log('Console: Token is blacklisted');
+            logger.warn(`logger: Token is blacklisted: ${hashToken}`);
             return res.status(401).json({ message: 'Token is blacklisted. Please log in again.' });
         }
 
