@@ -14,4 +14,13 @@ class Logger {
 }
 
 const logger = new Logger();
+
+// Test log to verify logger functionality
+logger.log('Logger initialized successfully.');
+try {
+    logger.log('This is a test log.');
+} catch (err) {
+    console.error('Logger failed:', err);
+}
+
 module.exports = logger;
