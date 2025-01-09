@@ -25,7 +25,7 @@ const authMiddleware = async (req, res, next) => {
         // Extract the token
         const token = parts[1];
 
-        // Hash the incoming token
+        // Hash the incoming token 
         const hashedToken = hashToken(token);
 
         // Check if the hashed token exists in the blacklist
