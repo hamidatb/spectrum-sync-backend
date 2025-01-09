@@ -4,9 +4,10 @@ const jwt = require('jsonwebtoken'); // Authentication token handling
 const bcrypt = require('bcryptjs'); // Password hashing
 const sql = require('mssql'); // SQL Server connection
 const connectToDatabase = require('../utils/dbConnection');
-const { validateFields } = require('../utils/validationUtils');
+const { validateUserId, validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
 const logger = require('../utils/logger'); 
+const { hashToken } = require('../utils/hashUtils');
 require('dotenv').config(); // Load environment variables from .env
 
 // Validate JWT Secret
@@ -146,5 +147,41 @@ exports.login = async (req, res, next) => {
     } catch (error) {
         logger.error(`Error during login: ${error.message}`);
         res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+/**
+ * (POST) Log user out
+ */
+exports.logout = async (req, res, next) => {
+    try {
+        // Extract the token from the Authorization header
+        const token = req.headers.authorization?.split(' ')[1];
+
+        if (!token) {
+            logger.warn('Logout failed: No token provided');
+            return res.status(400).json({ message: 'No token provided for logout' });
+        }
+
+        // Hash the token before storing it (Azure SQL Constraints here)
+        const hashedToken = hashToken(token);
+
+        // Store the token in blacklist to implement invalidation
+        logger.log('Connecting to the database to store token in blacklist...');
+        const pool = await connectToDatabase();
+
+        // Insert the token into a Blacklist table
+        await pool.request()
+            .input('token', sql.NVarChar, hashedToken)
+            .input('expiresAt', sql.DateTime, new Date(Date.now() + 2 * 60 * 60 * 1000)) // Token expires in 2 hours
+            .query('INSERT INTO TokenBlacklist (token, expiresAt) VALUES (@token, @expiresAt)');
+
+        logger.log('Hashed token stored in blacklist successfully');
+
+        res.status(200).json({ message: 'Logout successful' });
+        logger.log('Logout successful');
+    } catch (error) {
+        handleError(error, res, 'Error during logout');
     }
 };

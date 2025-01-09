@@ -246,6 +246,7 @@ exports.shareEvent = async (req, res, next) => {
             .input('email', sql.NVarChar, email)
             .query('SELECT userId FROM Users WHERE email = @email');
 
+
         if (userResult.recordset.length === 0){
             logger.warn(`No user found with the provided email: ${email}`);
             return res.status(404).json({ message: 'User to share with not found.' });
