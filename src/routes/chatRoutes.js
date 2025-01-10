@@ -103,4 +103,84 @@ router.post('/message/:chatId', (req, res, next) => {
     chatController.sendMessage(req, res, next);
 });
 
+/**
+ * @route   GET /api/chats
+ * @desc    List all chats that the authenticated user is part of
+ * @access  Private
+ *
+ * Example Request:
+ * GET /api/chats
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ */
+router.get('/', (req, res, next) => {
+    logger.log(`GET /api/chats - Listing all chats for user ${req.user.userId}`);
+    chatController.listAllChats(req, res, next);
+});
+
+/**
+ * @route   GET /api/chats/:chatId/messages
+ * @desc    Get the 20 most recent messages from a specific chat
+ * @access  Private
+ *
+ * Example Request:
+ * GET /api/chats/1/messages
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ */
+router.get('/:chatId/messages', (req, res, next) => {
+    const chatId = req.params.chatId;
+    logger.log(`GET /api/chats/${chatId}/messages - Fetching recent messages`);
+    chatController.getMostRecentChatMessages(req, res, next);
+});
+
+
+/**
+ * @route   POST /api/chats/:chatId/invite
+ * @desc    Send an invite link to a user to join a specific chat
+ * @access  Private
+ *
+ * Example Request:
+ * POST /api/chats/1/invite
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>",
+ *   "Content-Type": "application/json"
+ * }
+ *
+ * Body:
+ * {
+ *   "inviteeUserId": 5
+ * }
+ */
+router.post('/:chatId/invite', (req, res, next) => {
+    const chatId = req.params.chatId;
+    logger.log(`POST /api/chats/${chatId}/invite - Sending invite`);
+    chatController.sendChatInvite(req, res, next);
+});
+
+/**
+ * @route   GET /api/chats/invite/accept
+ * @desc    Handle invite link clicks to join the chat
+ * @access  Private (User must be authenticated)
+ *
+ * Example Request:
+ * GET /api/chats/invite/accept?token=<invite_token>
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ */
+router.get('/invite/accept', (req, res, next) => {
+    logger.log(`GET /api/chats/invite/accept - Accepting invite`);
+    chatController.acceptChatInvite(req, res, next);
+});
 module.exports = router;

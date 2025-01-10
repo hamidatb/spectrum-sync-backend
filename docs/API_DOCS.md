@@ -700,7 +700,9 @@ The API uses standard HTTP status codes to indicate the success or failure of AP
 
     ```env
     PORT=3000
-    JWT_SECRET=your_jwt_secret_key
+    JWT_SECRET_AUTH=jwt_auth_secret_key
+    JWT_SECRET_INVITE=jwt_invite_secret_key
+    BASE_URL=theazurebaseURL
     DB_USER=adminuser
     DB_PASSWORD=your_sql_password
     DB_SERVER=spectrum-sync-sql.database.windows.net

@@ -1,3 +1,5 @@
+// src/models/Chat.js
+
 const sql = require('mssql');
 
 class Chat {
@@ -62,6 +64,47 @@ class Chat {
             .query(`
                 DELETE FROM ChatMembers WHERE chatId = @chatId AND userId = @userId
             `);
+    }
+
+    static async getChatsByUserId(pool, userId) {
+        const result = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT c.chatId, c.chatName, c.isGroupChat, c.createdAt
+                FROM Chats c
+                INNER JOIN ChatMembers cm ON c.chatId = cm.chatId
+                WHERE cm.userId = @userId
+                ORDER BY c.createdAt DESC
+            `);
+
+        return result.recordset;
+    }
+
+    // Retrieve the 20 most recent messages sent in a chat
+    static async getRecentMessages(pool, chatId, limit = 20) {
+        const result = await pool.request()
+            .input('chatId', sql.Int, chatId)
+            .input('limit', sql.Int, limit)
+            .query(`
+                SELECT m.messageId, m.userId, u.username, m.content, m.createdAt
+                FROM Messages m
+                INNER JOIN Users u ON m.userId = u.userId
+                WHERE m.chatId = @chatId
+                ORDER BY m.createdAt DESC
+                OFFSET 0 ROWS FETCH NEXT @limit ROWS ONLY
+            `);
+
+        return result.recordset;
+    }
+
+    static async doesChatExist(pool, chatId) {
+        const result = await pool.request()
+            .input('chatId', sql.Int, chatId)
+            .query(`
+                SELECT chatId FROM Chats WHERE chatId = @chatId
+            `);
+
+        return result.recordset.length > 0;
     }
 }
 

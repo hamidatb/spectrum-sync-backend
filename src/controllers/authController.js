@@ -1,4 +1,5 @@
 // controllers/authController.js
+// TODO: Refactor this to use an auth model for all data handling.
 
 const jwt = require('jsonwebtoken'); // Authentication token handling
 const bcrypt = require('bcryptjs'); // Password hashing
@@ -8,12 +9,12 @@ const { validateUserId, validateFields } = require('../utils/validationUtils');
 const handleError = require('../utils/errorHandler');
 const logger = require('../utils/logger'); 
 const { hashToken } = require('../utils/hashToken');
-require('dotenv').config(); // Load environment variables from .env
+const config = require('../config');
 
 // Validate JWT Secret
-const jwtSecret = process.env.JWT_SECRET;
+const jwtSecret = config.JWT_SECRET_AUTH;
 if (!jwtSecret) {
-    throw new Error('JWT_SECRET is not set in environment variables.');
+    throw new Error('JWT_SECRET_AUTH is not set in config.js');
 }
 
 /**
