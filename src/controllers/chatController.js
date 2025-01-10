@@ -100,7 +100,8 @@ exports.leaveChat = async (req, res, next) => {
     try {
         const pool = await connectToDatabase();
 
-        // Remove user from the chat
+        // TODO: Check if the user is even a member of the chat before removing them
+        // Remove user from the chat 
         logger.log(`Removing user ${userId} from chat ${chatId}`);
         await Chat.removeMember(pool, chatId, userId);
 
