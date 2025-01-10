@@ -96,6 +96,16 @@ class Chat {
 
         return result.recordset;
     }
+
+    static async doesChatExist(pool, chatId) {
+        const result = await pool.request()
+            .input('chatId', sql.Int, chatId)
+            .query(`
+                SELECT chatId FROM Chats WHERE chatId = @chatId
+            `);
+
+        return result.recordset.length > 0;
+    }
 }
 
 module.exports = Chat;

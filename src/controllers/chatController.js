@@ -6,9 +6,10 @@ const { validateFields, validateUserId, validateChatId } = require('../utils/val
 const logger = require('../utils/logger');
 const handleError = require('../utils/errorHandler');
 const Chat = require('../models/Chat');
+const config = require('../config');
 
 /**
- * (POST) Create a new chat
+ * (POST) Create a new chat (auto valid for friends)
  * Supports both individual and group chats
  */
 exports.createChat = async (req, res, next) => {
@@ -208,5 +209,104 @@ exports.getMostRecentChatMessages = async (req, res, next) => {
         logger.log(`Successfully retrieved ${messages.length} messages for chat ${chatId}`);
     } catch (error) {
         handleError(error, res, 'Error retrieving messages');
+    }
+};
+
+/**
+ * (POST) Send a chat invite to a user (possibly not a friend)
+ */
+exports.sendChatInvite = async (req, res, next) => {
+    const chatId = parseInt(req.params.chatId, 10);
+    const { inviteeUserId } = req.body;
+    const inviterUserId = req.user?.userId;
+
+    // Validate input
+    if (!validateUserId(req, res)) return;
+    if (!validateChatId(req, res)) return;
+    if (!inviteeUserId || typeof inviteeUserId !== 'number') {
+        logger.warn('Invalid inviteeUserId');
+        return res.status(400).json({ message: 'Invalid inviteeUserId' });
+    }
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Verify that the inviter is a member of the chat
+        logger.log(`Verifying membership of inviter ${inviterUserId} in chat ${chatId}`);
+        const isMember = await Chat.isMember(pool, chatId, inviterUserId);
+        if (!isMember) {
+            logger.warn('Inviter is not a member of this chat.');
+            return res.status(403).json({ message: 'You are not a member of this chat.' });
+        }
+
+        // Generate an invite token with expiry (e.g., 24 hours)
+        const invitePayload = {
+            chatId,
+            inviteeUserId,
+            inviterUserId,
+        };
+        const token = jwt.sign(invitePayload, config.JWT_SECRET_INVITE, { expiresIn: '24h' });
+
+        // Generate invite link
+        const inviteLink = `${config.BASE_URL}/api/chats/invite/accept?token=${token}`;
+
+        // TODO: Send the invite link via email or in-app notification
+        // Right now just return the link in the response
+        logger.log(`Generated invite link for user ${inviteeUserId}: ${inviteLink}`);
+
+        res.status(200).json({ message: 'Invite sent successfully', inviteLink });
+    } catch (error) {
+        handleError(error, res, 'Error sending chat invite');
+    }
+};
+
+/**
+ * (GET) Accept a chat invite via the invite link
+ */
+exports.acceptChatInvite = async (req, res, next) => {
+    const { token } = req.query;
+    const userId = req.user?.userId;
+
+    if (!token) {
+        logger.warn('No token provided in invite acceptance');
+        return res.status(400).json({ message: 'Invite token is required.' });
+    }
+
+    try {
+        // Verify and decode the token
+        const decoded = jwt.verify(token, config.JWT_SECRET_INVITE);
+        const { chatId, inviteeUserId, inviterUserId } = decoded;
+
+        // Ensure that the inviteeUserId matches the authenticated user
+        if (inviteeUserId !== userId) {
+            logger.warn('Invite token does not match the authenticated user.');
+            return res.status(403).json({ message: 'Invalid invite token.' });
+        }
+
+        const pool = await connectToDatabase();
+
+        // Verify that the chat still exists
+        logger.log(`Verifying existence of chat ${chatId}`);
+        const chatExists = await Chat.doesChatExist(pool, chatId);
+        if (!chatExists) {
+            logger.warn('Chat does not exist.');
+            return res.status(404).json({ message: 'Chat does not exist.' });
+        }
+
+        // Add the user to the chat
+        logger.log(`Adding user ${userId} to chat ${chatId}`);
+        await Chat.addMembers(pool, chatId, [userId]);
+
+        res.status(200).json({ message: 'Successfully joined the chat.' });
+        logger.log(`User ${userId} joined chat ${chatId} via invite.`);
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            logger.warn('Invite token has expired.');
+            return res.status(400).json({ message: 'Invite link has expired.' });
+        } else if (error.name === 'JsonWebTokenError') {
+            logger.warn('Invalid invite token.');
+            return res.status(400).json({ message: 'Invalid invite token.' });
+        }
+        handleError(error, res, 'Error accepting chat invite');
     }
 };
