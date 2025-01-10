@@ -54,15 +54,22 @@ exports.register = async (req, res, next) => {
             .input('email', sql.NVarChar, email)
             .input('passwordHash', sql.NVarChar, hashedPassword)
             .query(`
-                INSERT INTO Users (username, email, passwordHash) 
-                OUTPUT INSERTED.userId, INSERTED.username, INSERTED.email 
-                VALUES (@username, @email, @passwordHash)
+                INSERT INTO Users (username, email, passwordHash)
+                VALUES (@username, @email, @passwordHash);
+                SELECT SCOPE_IDENTITY() AS userId;
             `);
 
-        const newUser = insertResult.recordset[0];
-        logger.log(`User inserted successfully with userId: ${newUser.userId}`);
+        const newUserId = insertResult.recordset[0].userId;
+        logger.log(`User inserted successfully with userId: ${newUserId}`);
 
-        // Create JWT token
+        // Fetch the newly inserted user's details
+        logger.log('Fetching the newly inserted user details...');
+        const userDetailsResult = await pool.request()
+            .input('userId', sql.Int, newUserId)
+            .query(`SELECT userId, username, email FROM Users WHERE userId = @userId`);
+
+        const newUser = userDetailsResult.recordset[0];
+
         logger.log('Creating JWT token...');
         const token = jwt.sign(
             { userId: newUser.userId },

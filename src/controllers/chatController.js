@@ -1,0 +1,158 @@
+const sql = require('mssql'); // SQL Server connection
+const connectToDatabase = require('../utils/dbConnection');
+const { validateFields, validateUserId, validateChatId } = require('../utils/validationUtils');
+const logger = require('../utils/logger');
+const handleError = require('../utils/errorHandler');
+const Chat = require('../models/Chat');
+
+/**
+ * (POST) Create a new chat
+ * Supports both individual and group chats
+ */
+exports.createChat = async (req, res, next) => {
+    const { chatName, userIds } = req.body;
+    const creatorId = req.user?.userId;
+
+    // Validate user ID
+    if (!validateUserId(req, res)) return;
+
+    // Validate required body fields
+    if (!validateFields(req, res, ['userIds'])) return;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Check if user IDs are valid friends
+        logger.log(`Checking if user IDs ${userIds} are valid friends of user ${creatorId}`);
+        const isValid = await Chat.isValidFriend(pool, creatorId, userIds);
+
+        if (!isValid) {
+            logger.warn('Some user IDs are not valid friends.');
+            return res.status(400).json({ message: 'Some user IDs are not valid friends.' });
+        }
+
+        // Create the chat
+        logger.log('Creating new chat');
+        const isGroupChat = userIds.length > 1;
+        const chat = await Chat.create(pool, chatName, isGroupChat, creatorId);
+
+        // Add members to the chat
+        logger.log('Adding members to the chat');
+        await Chat.addMembers(pool, chat.chatId, [creatorId, ...userIds]);
+
+        res.status(201).json({ message: 'Chat created successfully', chatId: chat.chatId });
+        logger.log('Chat creation process completed successfully.');
+    } catch (error) {
+        handleError(error, res, 'Error creating chat');
+    }
+};
+
+/**
+ * (POST) Join a chat
+ */
+exports.joinChat = async (req, res, next) => {
+    const chatId = parseInt(req.params.chatId, 10);
+    const userId = req.user?.userId;
+
+    // Validate user ID
+    if (!validateUserId(req, res)) return;
+    // Validate chat ID
+    if (!validateChatId(req, res)) return;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Check if the user is already a member
+        logger.log(`Checking if user ${userId} is already a member of chat ${chatId}`);
+        const isMember = await Chat.isMember(pool, chatId, userId);
+
+        if (isMember) {
+            logger.warn('User is already a member of this chat.');
+            return res.status(400).json({ message: 'User is already a member of this chat.' });
+        }
+
+        // Add user to the chat
+        logger.log('Adding user to the chat');
+        await Chat.addMembers(pool, chatId, [userId]);
+
+        res.status(200).json({ message: 'Joined chat successfully' });
+        logger.log('User joined chat successfully.');
+    } catch (error) {
+        handleError(error, res, 'Error joining chat');
+    }
+};
+
+/**
+ * (POST) Leave a chat
+ */
+exports.leaveChat = async (req, res, next) => {
+    const chatId = parseInt(req.params.chatId, 10);
+    const userId = req.user?.userId;
+
+    // Validate user ID
+    if (!validateUserId(req, res)) return;
+    // Validate chat ID
+    if (!validateChatId(req, res)) return;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Remove user from the chat
+        logger.log(`Removing user ${userId} from chat ${chatId}`);
+        await Chat.removeMember(pool, chatId, userId);
+
+        res.status(200).json({ message: 'Left chat successfully' });
+        logger.log('User left chat successfully.');
+    } catch (error) {
+        handleError(error, res, 'Error leaving chat');
+    }
+};
+
+/**
+ * (POST) Send a message to a chat
+ */
+exports.sendMessage = async (req, res, next) => {
+    const chatId = parseInt(req.params.chatId, 10);
+    const userId = req.user?.userId;
+    const { content } = req.body;
+
+    // Validate user ID
+    if (!validateUserId(req, res)) return;
+
+    // Validate required fields
+    if (!validateFields(req, res, ['content'])) return;
+
+    // Validate chat ID
+    if (!validateChatId(req, res)) return;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Ensure the user is a member of the chat before sending a message
+        logger.log(`Verifying membership of user ${userId} in chat ${chatId}`);
+        const isMember = await Chat.isMember(pool, chatId, userId);
+        if (!isMember) {
+            logger.warn('User is not a member of this chat.');
+            return res.status(403).json({ message: 'User is not a member of this chat.' });
+        }
+
+        // Insert the message into the Messages table
+        logger.log(`Inserting message into Messages table for chat ${chatId}`);
+        const messageInsertResult = await pool.request()
+            .input('chatId', sql.Int, chatId)
+            .input('userId', sql.Int, userId)
+            .input('content', sql.NVarChar, content)
+            .query(`
+                INSERT INTO Messages (chatId, userId, content)
+                VALUES (@chatId, @userId, @content);
+                SELECT SCOPE_IDENTITY() AS messageId;
+            `);
+
+        const messageId = messageInsertResult.recordset[0].messageId;
+        logger.log(`Message sent successfully with messageId: ${messageId}`);
+
+        res.status(201).json({ message: 'Message sent successfully', messageId });
+    } catch (error) {
+        handleError(error, res, 'Error sending message');
+    }
+};
