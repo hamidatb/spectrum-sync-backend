@@ -1,3 +1,5 @@
+// src/controllers/chatController.js
+
 const sql = require('mssql'); // SQL Server connection
 const connectToDatabase = require('../utils/dbConnection');
 const { validateFields, validateUserId, validateChatId } = require('../utils/validationUtils');
@@ -154,5 +156,57 @@ exports.sendMessage = async (req, res, next) => {
         res.status(201).json({ message: 'Message sent successfully', messageId });
     } catch (error) {
         handleError(error, res, 'Error sending message');
+    }
+};
+
+/**
+ * (GET) List all chats the authenticated user is part of
+ */
+exports.listAllChats = async (req, res, next) => {
+    const userId = req.user?.userId;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Fetch chats from the database
+        logger.log(`Fetching all chats for user ${userId}`);
+        const chats = await Chat.getChatsByUserId(pool, userId);
+
+        res.status(200).json({ chats });
+        logger.log(`Successfully retrieved ${chats.length} chats for user ${userId}`);
+    } catch (error) {
+        handleError(error, res, 'Error retrieving chats');
+    }
+};
+
+/**
+ * (GET) Get the 20 most recent messages from a specific chat
+ */
+exports.getMostRecentChatMessages = async (req, res, next) => {
+    const userId = req.user?.userId;
+    const chatId = parseInt(req.params.chatId, 10);
+
+    if (!validateChatId(req, res)) return;
+    if (!validateUserId(req, res)) return;
+
+    try {
+        const pool = await connectToDatabase();
+
+        // Verify that the user is a member of the chat
+        logger.log(`Verifying membership of user ${userId} in chat ${chatId}`);
+        const isMember = await Chat.isMember(pool, chatId, userId);
+        if (!isMember) {
+            logger.warn('User is not a member of this chat.');
+            return res.status(403).json({ message: 'User is not a member of this chat.' });
+        }
+
+        // Fetch recent messages
+        logger.log(`Fetching recent messages for chat ${chatId}`);
+        const messages = await Chat.getRecentMessages(pool, chatId, 20);
+
+        res.status(200).json({ messages });
+        logger.log(`Successfully retrieved ${messages.length} messages for chat ${chatId}`);
+    } catch (error) {
+        handleError(error, res, 'Error retrieving messages');
     }
 };

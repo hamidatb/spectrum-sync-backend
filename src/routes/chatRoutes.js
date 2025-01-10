@@ -103,4 +103,40 @@ router.post('/message/:chatId', (req, res, next) => {
     chatController.sendMessage(req, res, next);
 });
 
+/**
+ * @route   GET /api/chats
+ * @desc    List all chats that the authenticated user is part of
+ * @access  Private
+ *
+ * Example Request:
+ * GET /api/chats
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ */
+router.get('/', (req, res, next) => {
+    logger.log(`GET /api/chats - Listing all chats for user ${req.user.userId}`);
+    chatController.listAllChats(req, res, next);
+});
+
+/**
+ * @route   GET /api/chats/:chatId/messages
+ * @desc    Get the 20 most recent messages from a specific chat
+ * @access  Private
+ *
+ * Example Request:
+ * GET /api/chats/1/messages
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ */
+router.get('/:chatId/messages', (req, res, next) => {
+    const chatId = req.params.chatId;
+    logger.log(`GET /api/chats/${chatId}/messages - Fetching recent messages`);
+    chatController.getMostRecentChatMessages(req, res, next);
+});
 module.exports = router;
