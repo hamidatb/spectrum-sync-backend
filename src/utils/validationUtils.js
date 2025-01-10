@@ -71,8 +71,8 @@ const validateChatId = (req, res) => {
         res.status(400).json({ message: 'Chat ID is required.' });
         return false;
     }
-    if (isNaN(parseInt(eventId, 10))) {
-        console.warn('Invalid Chat ID format:', eventId);
+    if (isNaN(parseInt(chatId, 10))) { // Corrected here
+        console.warn('Invalid Chat ID format:', chatId); // And here
         res.status(400).json({ message: 'Chat ID must be a valid number.' });
         return false;
     }
