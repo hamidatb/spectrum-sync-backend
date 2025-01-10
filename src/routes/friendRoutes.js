@@ -61,4 +61,27 @@ router.post('/remove', (req, res, next) => {
     friendController.removeFriend(req, res, next);
 });
 
+/**
+ * @route   GET /api/friends/list
+ * @desc    Get the authenticated user's friends list
+ * @access  Private
+ *
+ * Example Request:
+ * GET /api/friends/list
+ *
+ * Headers:
+ * {
+ *   "Authorization": "Bearer <your_token>"
+ * }
+ *
+ * Response:
+ * {
+ *   "friends": [2, 3, 4]
+ * }
+ */
+router.get('/list', (req, res, next) => {
+    logger.log('GET /api/friends/list - Retrieving friends list');
+    friendController.getFriendsList(req, res, next);
+});
+
 module.exports = router;
