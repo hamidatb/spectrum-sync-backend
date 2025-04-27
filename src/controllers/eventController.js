@@ -79,9 +79,13 @@ exports.getEvents = async (req, res, next) => {
 
         // Make sure the withWho param is sent over as a LIST
         const events = result.recordset.map(event => {
-            let withWhoArray = null;
+            let withWhoArray = [];
+
             if (event.withWho && event.withWho !== 'N/A') {
-                withWhoArray = event.withWho.split(',').map(person => person.trim());
+                withWhoArray = event.withWho
+                .split(',')
+                .map(person => person.trim())
+                .filter(person => person.length > 0);
             }
             return {
                 ...event,
